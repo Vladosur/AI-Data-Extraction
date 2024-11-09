@@ -1,0 +1,12 @@
+2024-11-09 20:14:41 - src.utils.image_utils - INFO - Logger inizializzato
+2024-11-09 20:14:45 - src.utils.checkpoint_manager - INFO - Logger inizializzato
+2024-11-09 20:14:45 - src.utils.session_manager - INFO - Logger inizializzato
+2024-11-09 20:14:45 - src.utils.file_validator - INFO - Logger inizializzato
+2024-11-09 20:14:45 - src.utils.pdf_validator - INFO - Logger inizializzato
+2024-11-09 20:14:45 - src.extractor.pdf_processor - INFO - Logger inizializzato
+2024-11-09 20:14:47 - src.extractor.vision_api - INFO - Logger inizializzato
+2024-11-09 20:14:47 - src.extractor.data_processor - INFO - Logger inizializzato
+2024-11-09 20:14:47 - ui.components.file_uploader - INFO - Logger inizializzato
+2024-11-09 20:14:47 - ui.components.progress - INFO - Logger inizializzato
+2024-11-09 20:14:47 - ui.components.results_viewer - INFO - Logger inizializzato
+2024-11-09 20:14:47 - pdf_extractor - INFO - Logger inizializzato

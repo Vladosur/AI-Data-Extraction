@@ -1,0 +1,35 @@
+/* Stili base */
+.stApp {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* Personalizzazione sidebar */
+.css-1d391kg {
+    padding: 2rem 1rem;
+}
+
+/* Personalizzazione upload area */
+.stFileUploader {
+    border: 2px dashed #ccc;
+    border-radius: 8px;
+    padding: 1rem;
+    text-align: center;
+}
+
+/* Personalizzazione progress bar */
+.stProgress > div > div {
+    background-color: #00acb5;
+}
+
+/* Personalizzazione bottoni */
+.stButton > button {
+    width: 100%;
+    margin-top: 1rem;
+}
+
+/* Personalizzazione tabella risultati */
+.stDataFrame {
+    border: 1px solid #eee;
+    border-radius: 8px;
+}  

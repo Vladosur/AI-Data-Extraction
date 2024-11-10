@@ -1,2 +1,7 @@
 01-Files/
 venv/
+.env
+logs/
+temp/
+output/
+.devcontainer/

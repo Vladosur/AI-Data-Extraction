@@ -1,3 +1,5 @@
+# src/utils/__init__.py
+
 """
 Package per le utilità del progetto.
 """
@@ -7,6 +9,7 @@ from .image_utils import validate_image, optimize_image, get_image_info
 from .session_manager import SessionManager
 from .file_validator import FileValidator
 from .pdf_validator import PDFValidator, PDFValidationError
+from .json_validator import JSONValidator, JSONValidationError
 
 __all__ = [
     'setup_logger', 
@@ -16,5 +19,7 @@ __all__ = [
     'SessionManager',
     'FileValidator',
     'PDFValidator',
-    'PDFValidationError'
+    'PDFValidationError',
+    'JSONValidator',
+    'JSONValidationError'
 ]

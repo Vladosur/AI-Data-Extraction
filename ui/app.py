@@ -123,12 +123,12 @@ def main():
                             if st.button("📥 Carica", key=f"load_{session['timestamp']}"):
                                 # Carica sessione
                                 SessionManager.load_specific_session(session['timestamp'])
-                                st.rerun()
+                                # st.rerun()
                         with col2:
                             if st.button("🗑️", key=f"delete_{session['timestamp']}"):
                                 # Elimina sessione
                                 SessionManager.delete_session(session['timestamp'])
-                                st.rerun()
+                                # st.rerun()
                                 
                         st.markdown("</div>", unsafe_allow_html=True)
         else:
@@ -143,7 +143,7 @@ def main():
             if st.button("🧹 Pulisci Sessioni Vecchie", type="secondary"):
                 SessionManager.cleanup_old_sessions()
                 st.success("✅ Pulizia completata")
-                st.rerun()
+                # st.rerun()
 
     # Area principale dei risultati
     if st.session_state.results_df is not None:
@@ -168,7 +168,7 @@ def main():
         with col2:
             if st.button("🆕 Nuova Elaborazione", type="primary"):
                 st.session_state.clear()
-                # st.rerun()
+                st.rerun()
                 
         st.markdown("</div>", unsafe_allow_html=True)
         

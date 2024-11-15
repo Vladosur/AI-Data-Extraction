@@ -199,25 +199,24 @@ def main():
                     temp_path = SessionManager.save_file_to_temp(uploaded_file)
                     
                     # Inizializza i processori
-                    processor = PDFProcessor(Path("temp"))
+                    processor = PDFProcessor()  
                     vision_api = VisionAPI(api_key)
                     
                     try:
-                        # Converti PDF in immagini
+                        # Converti PDF in immagini mantenendole in memoria
                         progress_bar.update(10, "Validazione e conversione PDF in immagini...")
                         
-                        # Leggi il file PDF come binary
-                        with open(temp_path, 'rb') as pdf_file:
-                            image_paths = processor.process_pdf(pdf_file)
+                        # Usa direttamente l'UploadedFile di Streamlit
+                        images = processor.process_pdf(uploaded_file)
                         
                         # Estrai dati
                         progress_bar.update(30, "Analizzando le pagine...")
                         results = []
-                        total_pages = len(image_paths)
+                        total_pages = len(images)
                         
-                        for i, img_path in enumerate(image_paths, 1):
+                        for i, image in enumerate(images, 1):
                             try:
-                                result = vision_api.extract_data(img_path, query)
+                                result = vision_api.extract_data(image, query)
                                 results.extend(result)
                                 progress_bar.update(
                                     30 + (i * 60 // total_pages),

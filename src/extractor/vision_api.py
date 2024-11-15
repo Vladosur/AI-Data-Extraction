@@ -1,5 +1,6 @@
 # src/extractor/vision_api.py
 
+import datetime
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple
 import base64
@@ -87,12 +88,12 @@ class VisionAPI:
             logger.error(f"Errore nella chiamata API: {str(e)}")
             raise VisionAPIError(f"Errore nella chiamata API: {str(e)}") from e
 
-    def extract_data(self, image_path: Path, query: Optional[str] = None) -> List[Dict]:
+    def extract_data(self, image: Image.Image, query: Optional[str] = None) -> List[Dict]:
         """
         Estrae dati da un'immagine usando Vision API.
         
         Args:
-            image_path: Percorso dell'immagine da analizzare
+            image: Immagine PIL da analizzare
             query: Query specifica per l'estrazione (opzionale)
             
         Returns:
@@ -101,11 +102,11 @@ class VisionAPI:
         Raises:
             VisionAPIError: In caso di errori nell'estrazione dei dati
         """
-        logger.info(f"Inizio estrazione dati da: {image_path}")
+        logger.info("Inizio estrazione dati da immagine")
         
         try:
             # Codifica l'immagine in base64
-            base64_image = self._convert_to_base64(image_path)
+            base64_image = self._convert_to_base64(image)
             
             # Prepara il prompt in base alla query
             prompt = VISION_SETTINGS['PROMPT_TEMPLATE']
@@ -139,7 +140,7 @@ class VisionAPI:
             processed_response = self._process_response(response)
             
             # Salva la risposta processata
-            self._save_response(processed_response, image_path)
+            self._save_response(processed_response)
             
             return processed_response
             
@@ -150,44 +151,33 @@ class VisionAPI:
             logger.error(f"Errore nell'estrazione dei dati: {str(e)}")
             raise VisionAPIError(f"Errore nell'estrazione dei dati: {str(e)}") from e
 
-    def _convert_to_base64(self, image_path: Path) -> str:
+    def _convert_to_base64(self, image: Image.Image) -> str:
         """
-        Converte un'immagine in base64 con ottimizzazione per Vision API.
+        Converte un'immagine PIL in stringa base64.
         
         Args:
-            image_path: Percorso dell'immagine
+            image: Immagine PIL da convertire
             
         Returns:
             str: Immagine codificata in base64
         """
         try:
-            # Apri l'immagine con PIL
-            with Image.open(image_path) as img:
-                # Ridimensiona mantenendo l'aspect ratio
-                width, height = img.size
-                ratio = min(
-                    IMAGE_SETTINGS['MAX_SIZE']['WIDTH'] / width,
-                    IMAGE_SETTINGS['MAX_SIZE']['HEIGHT'] / height
-                )
-                if ratio < 1:
-                    new_size = (int(width * ratio), int(height * ratio))
-                    img = img.resize(new_size, Image.Resampling.LANCZOS)
-
-                # Converti in JPEG in memoria
-                buffer = io.BytesIO()
-                img.save(
-                    buffer, 
-                    format=IMAGE_SETTINGS['FORMAT'],
-                    quality=IMAGE_SETTINGS['QUALITY'],
-                    optimize=True
-                )
-                
-                # Converti in base64
-                return base64.b64encode(buffer.getvalue()).decode('utf-8')
-                
+            buffer = io.BytesIO()
+            image.save(
+                buffer, 
+                format=IMAGE_SETTINGS['FORMAT'],
+                quality=IMAGE_SETTINGS['QUALITY'],
+                optimize=True
+            )
+            base64_image = base64.b64encode(buffer.getvalue()).decode('utf-8')
+            return base64_image
+            
         except Exception as e:
             logger.error(f"Errore nella conversione in base64: {e}")
             raise VisionAPIError(f"Errore nella conversione dell'immagine in base64: {str(e)}")
+        finally:
+            if 'buffer' in locals():
+                buffer.close()
     
     def _process_response(self, response) -> List[Dict]:
         """
@@ -230,18 +220,18 @@ class VisionAPI:
             logger.error(f"Errore nel processing della risposta: {str(e)}")
             return []
 
-    def _save_response(self, response: List[Dict], image_path: Path) -> None:
+    def _save_response(self, response: List[Dict]) -> None:
         """
         Salva la risposta processata in formato JSON.
         
         Args:
             response: Risposta processata da salvare
-            image_path: Percorso dell'immagine originale
         """
         try:
             output_dir = Path("output/json")
             output_dir.mkdir(parents=True, exist_ok=True)
-            output_file = output_dir / f"{image_path.stem}_response.json"
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            output_file = output_dir / f"response_{timestamp}.json"
             
             with open(output_file, "w", encoding="utf-8") as f:
                 json.dump(response, f, ensure_ascii=False, indent=4)
@@ -250,4 +240,3 @@ class VisionAPI:
             
         except Exception as e:
             logger.error(f"Errore nel salvataggio della risposta: {str(e)}")
-            # Non solleviamo l'eccezione qui per non interrompere il flusso principale

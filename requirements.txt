@@ -38,6 +38,7 @@ pillow==11.0.0
 platformdirs==4.3.6
 pluggy==1.5.0
 protobuf==5.28.3
+psutil==6.1.0
 pyarrow==18.0.0
 pycodestyle==2.12.1
 pydantic==2.9.2

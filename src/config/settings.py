@@ -6,25 +6,44 @@ import logging
 from pathlib import Path
 
 # Configurazioni per le immagini
+# IMAGE_SETTINGS = {
+#     'DPI': 200,  # Ridotto ma ancora buono per il testo
+#     'FORMAT': 'JPEG',
+#     'QUALITY': 85,
+#     'MAX_SIZE': {
+#         'WIDTH': 1024,   # Ridotto per rispettare i limiti
+#         'HEIGHT': 1024   # Ridotto per rispettare i limiti
+#     },
+# }
 IMAGE_SETTINGS = {
-    'DPI': 300,
+    'DPI': 200,  
     'FORMAT': 'JPEG',
     'QUALITY': 85,
     'MAX_SIZE': {
-        'WIDTH': 2048,
-        'HEIGHT': 2048
+        'WIDTH': 750,     # Massimizziamo il lato corto rimanendo sotto 768px
+        'HEIGHT': 1060    # Manteniamo la proporzione A4 (~1.414)
     }
 }
 
 # Configurazioni per OpenAI Vision
 VISION_SETTINGS = {
     'MODEL': 'gpt-4o-mini',
+    'IMAGE_DETAIL': 'high',
     'MAX_TOKENS': 1000,
-    'TEMPERATURE': 0.3,
+    'TEMPERATURE': 0,
     'PROMPT_TEMPLATE': """Sei un assistente specializzato nell'estrazione di dati strutturati da listini prezzi.
 
 Analizza questa immagine di un listino prezzi ed estrai i dati richiesti.
 DEVI RISPONDERE SOLO ED ESCLUSIVAMENTE IN FORMATO JSON, senza alcun testo aggiuntivo.
+
+**ATTENZIONE: ASPETTO CRITICO**
+Quando un prodotto presenta più misure/varianti con lo stesso prezzo, DEVI CREARE UN RECORD SEPARATO PER OGNI VARIANTE.
+Esempio: Se vedi:
+"COD. RC330-40 Misura 40 cm
+ COD. RC330-46 Misura 46 cm
+ COD. RC330-48 Misura 48 cm
+ € 148,00 cad."
+Devi creare TRE record separati, uno per ogni codice e misura, tutti con lo stesso prezzo.
 
 **IMPORTANTE:** I prezzi dei prodotti seguono due possibili schemi:
 
@@ -32,6 +51,7 @@ DEVI RISPONDERE SOLO ED ESCLUSIVAMENTE IN FORMATO JSON, senza alcun testo aggiun
    * Il prodotto ha un unico prezzo unitario
    * Non ci sono quantità minime o restrizioni
    * Il prezzo viene indicato direttamente (es. 108,00)
+   * IMPORTANTE: Se lo stesso prezzo si applica a più varianti/misure, crea un record per OGNI variante
 
 2. **Prezzi per Quantità:**
    * Il prodotto ha prezzi variabili basati sulla quantità
@@ -60,45 +80,32 @@ Per ogni prodotto devi restituire:
     ]
 }
 
-ESEMPI:
+ESEMPI CORRETTI di output per prodotti con varianti:
 
-1. Prezzo Singolo:
 {
-    "codice": "T50D",
-    "descrizione": "Attacco definitivo per carrozzina",
-    "tipo_prezzo": "singolo",
-    "prezzo_unitario": 108.0
-}
-
-2. Prezzi per Quantità:
-{
-    "codice": "N04",
-    "descrizione": "Deambulatore pieghevole in alluminio...",
-    "tipo_prezzo": "quantita",
-    "prezzi_quantita": [
+    "prodotti": [
         {
-            "quantita": 4,
-            "prezzo": 39.0,
-            "quantita_minima": true,
-            "non_vendibile_separatamente": true
+            "codice": "RC330-40",
+            "descrizione": "Sedia comoda reclinabile, 4 ruote da 20 cm - Misura 40 cm",
+            "tipo_prezzo": "singolo",
+            "prezzo_unitario": 148.0
         },
         {
-            "quantita": 12,
-            "prezzo": 37.0,
-            "quantita_minima": false,
-            "non_vendibile_separatamente": false
+            "codice": "RC330-46",
+            "descrizione": "Sedia comoda reclinabile, 4 ruote da 20 cm - Misura 46 cm",
+            "tipo_prezzo": "singolo",
+            "prezzo_unitario": 148.0
+        },
+        {
+            "codice": "RC330-48",
+            "descrizione": "Sedia comoda reclinabile, 4 ruote da 20 cm - Misura 48 cm",
+            "tipo_prezzo": "singolo",
+            "prezzo_unitario": 148.0
         }
-    ],
-    "descrizione_quantita": "Confezione: Pz.4 non vendibili separatamente"
+    ]
 }
 
-ATTENZIONE:
-1. Distingui chiaramente tra prezzi singoli e prezzi per quantità
-2. Per i prezzi per quantità, identifica SEMPRE la quantità minima
-3. Cattura TUTTE le informazioni sulle restrizioni di vendita
-4. Mantieni l'ordine originale dei prezzi dal listino
-5. Includi TUTTE le quantità mostrate nel listino
-"""
+RICORDA: NON OMETTERE MAI nessuna variante dimensionale. Se vedi più codici con misure diverse ma stesso prezzo, devi creare un record separato per OGNUNO di essi."""
 }
 
 # Configurazioni per il logging

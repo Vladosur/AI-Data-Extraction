@@ -5,6 +5,9 @@ from typing import List, Dict, Optional, Tuple
 import base64
 from openai import OpenAI
 import openai
+from PIL import Image
+import io
+from src.config.settings import IMAGE_SETTINGS
 from src.config.settings import VISION_SETTINGS
 from src.utils.logger import setup_logger
 from src.utils.retry_manager import with_retry, RetryError
@@ -102,8 +105,7 @@ class VisionAPI:
         
         try:
             # Codifica l'immagine in base64
-            with open(image_path, "rb") as image_file:
-                base64_image = base64.b64encode(image_file.read()).decode('utf-8')
+            base64_image = self._convert_to_base64(image_path)
             
             # Prepara il prompt in base alla query
             prompt = VISION_SETTINGS['PROMPT_TEMPLATE']
@@ -122,11 +124,12 @@ class VisionAPI:
                         {
                             "type": "image_url",
                             "image_url": {
-                                "url": f"data:image/jpeg;base64,{base64_image}"
-                            }
-                        }
-                    ]
-                }
+                                "url": f"data:image/jpeg;base64,{base64_image}",
+                                "detail": "high"
+                            },
+                        },
+                    ],
+                },
             ]
             
             # Chiamata API con retry
@@ -147,6 +150,45 @@ class VisionAPI:
             logger.error(f"Errore nell'estrazione dei dati: {str(e)}")
             raise VisionAPIError(f"Errore nell'estrazione dei dati: {str(e)}") from e
 
+    def _convert_to_base64(self, image_path: Path) -> str:
+        """
+        Converte un'immagine in base64 con ottimizzazione per Vision API.
+        
+        Args:
+            image_path: Percorso dell'immagine
+            
+        Returns:
+            str: Immagine codificata in base64
+        """
+        try:
+            # Apri l'immagine con PIL
+            with Image.open(image_path) as img:
+                # Ridimensiona mantenendo l'aspect ratio
+                width, height = img.size
+                ratio = min(
+                    IMAGE_SETTINGS['MAX_SIZE']['WIDTH'] / width,
+                    IMAGE_SETTINGS['MAX_SIZE']['HEIGHT'] / height
+                )
+                if ratio < 1:
+                    new_size = (int(width * ratio), int(height * ratio))
+                    img = img.resize(new_size, Image.Resampling.LANCZOS)
+
+                # Converti in JPEG in memoria
+                buffer = io.BytesIO()
+                img.save(
+                    buffer, 
+                    format=IMAGE_SETTINGS['FORMAT'],
+                    quality=IMAGE_SETTINGS['QUALITY'],
+                    optimize=True
+                )
+                
+                # Converti in base64
+                return base64.b64encode(buffer.getvalue()).decode('utf-8')
+                
+        except Exception as e:
+            logger.error(f"Errore nella conversione in base64: {e}")
+            raise VisionAPIError(f"Errore nella conversione dell'immagine in base64: {str(e)}")
+    
     def _process_response(self, response) -> List[Dict]:
         """
         Processa la risposta dell'API e la converte in formato strutturato.

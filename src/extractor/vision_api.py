@@ -88,13 +88,12 @@ class VisionAPI:
             logger.error(f"Errore nella chiamata API: {str(e)}")
             raise VisionAPIError(f"Errore nella chiamata API: {str(e)}") from e
 
-    def extract_data(self, image: Image.Image, query: Optional[str] = None) -> List[Dict]:
+    def extract_data(self, image: Image.Image) -> List[Dict]:
         """
         Estrae dati da un'immagine usando Vision API.
         
         Args:
             image: Immagine PIL da analizzare
-            query: Query specifica per l'estrazione (opzionale)
             
         Returns:
             Lista di dizionari contenenti i dati estratti
@@ -105,15 +104,11 @@ class VisionAPI:
         logger.info("Inizio estrazione dati da immagine")
         
         try:
-            # Codifica l'immagine in base64
             base64_image = self._convert_to_base64(image)
             
-            # Prepara il prompt in base alla query
+            # Usa il prompt template senza aggiungere query
             prompt = VISION_SETTINGS['PROMPT_TEMPLATE']
-            if query:
-                prompt += f"\n\nRichiesta specifica: {query}"
             
-            # Prepara il messaggio per l'API
             messages = [
                 {
                     "role": "user",
@@ -133,13 +128,8 @@ class VisionAPI:
                 },
             ]
             
-            # Chiamata API con retry
             response = self._make_api_call(messages)
-            
-            # Processa la risposta
             processed_response = self._process_response(response)
-            
-            # Salva la risposta processata
             self._save_response(processed_response)
             
             return processed_response

@@ -29,50 +29,151 @@ class SessionManager:
             st.session_state.uploaded_file = None
         if 'results_df' not in st.session_state:
             st.session_state.results_df = None
-        if 'last_query' not in st.session_state:
-            st.session_state.last_query = ""
         if 'processing_timestamp' not in st.session_state:
             st.session_state.processing_timestamp = None
         if 'processing_state' not in st.session_state:
             st.session_state.processing_state = None
-        if 'current_page' not in st.session_state:
-            st.session_state.current_page = 0
+        if 'session_metadata' not in st.session_state:
+            st.session_state.session_metadata = {}
+        if 'export_history' not in st.session_state:
+            st.session_state.export_history = []
+        if 'is_new_session' not in st.session_state:
+            st.session_state.is_new_session = True
 
+    @classmethod
+    def update_session_metadata(cls, metadata_update: Dict[str, Any]):
+        """
+        Aggiorna i metadati della sessione.
+        
+        Args:
+            metadata_update: Dizionario con i nuovi metadati da aggiungere/aggiornare
+        """
+        try:
+            if 'session_metadata' not in st.session_state:
+                st.session_state.session_metadata = {}
+                
+            st.session_state.session_metadata.update(metadata_update)
+            
+            # Aggiorna anche il timestamp di processing se presente nei metadati
+            if 'timestamp' in metadata_update:
+                st.session_state.processing_timestamp = metadata_update['timestamp']
+                
+            # Salva checkpoint con i metadati aggiornati
+            cls._save_processing_checkpoint({
+                'stage': 'metadata_update',
+                'metadata': st.session_state.session_metadata,
+                'timestamp': datetime.now().isoformat()
+            })
+            
+            logger.debug(f"Metadati sessione aggiornati: {metadata_update}")
+            
+        except Exception as e:
+            logger.error(f"Errore nell'aggiornamento dei metadati: {e}")
+            raise
+        
+    @classmethod
+    def add_export_record(cls, export_info: Dict[str, Any]):
+        """
+        Aggiunge un record di esportazione alla cronologia.
+        
+        Args:
+            export_info: Informazioni sull'esportazione (formato, nome file, timestamp, etc.)
+        """
+        try:
+            if 'export_history' not in st.session_state:
+                st.session_state.export_history = []
+                
+            st.session_state.export_history.append(export_info)
+            
+            # Aggiorna i metadati della sessione
+            metadata_update = {
+                'last_export': export_info,
+                'export_count': len(st.session_state.export_history),
+                'timestamp': export_info['timestamp']
+            }
+            
+            cls.update_session_metadata(metadata_update)
+            
+            # Salva lo stato aggiornato
+            cls._save_processing_checkpoint({
+                'stage': 'export',
+                'export_info': export_info,
+                'metadata': st.session_state.session_metadata
+            })
+            
+            logger.info(f"Record esportazione aggiunto: {export_info}")
+            
+        except Exception as e:
+            logger.error(f"Errore nell'aggiunta del record di esportazione: {e}")
+            raise
+        
+    @classmethod
+    def get_session_info(cls) -> Dict[str, Any]:
+        """
+        Recupera le informazioni complete della sessione corrente.
+        
+        Returns:
+            Dict[str, Any]: Informazioni della sessione
+        """
+        try:
+            return {
+                'session_id': st.session_state.get('session_id'),
+                'file_name': st.session_state.get('uploaded_file'),
+                'processing_timestamp': st.session_state.get('processing_timestamp'),
+                'metadata': st.session_state.get('session_metadata', {}),
+                'export_history': st.session_state.get('export_history', []),
+                'has_results': st.session_state.get('results_df') is not None,
+                'rows_count': len(st.session_state.results_df) if st.session_state.get('results_df') is not None else 0
+            }
+        except Exception as e:
+            logger.error(f"Errore nel recupero delle informazioni della sessione: {e}")
+            return {}
+        
     @classmethod
     def save_file_to_temp(cls, uploaded_file) -> Path:
         """
         Salva il file caricato nella directory temporanea.
-        
-        Args:
-            uploaded_file: File caricato attraverso Streamlit
-            
-        Returns:
-            Path: Percorso del file salvato
         """
-        temp_dir = Path("temp/uploads")
-        temp_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Genera nome file unico
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        temp_path = temp_dir / f"{timestamp}_{uploaded_file.name}"
-        
-        # Salva il file
-        temp_path.write_bytes(uploaded_file.getvalue())
-        
-        # Crea checkpoint iniziale
-        cls._save_processing_checkpoint({
-            'stage': 'upload',
-            'file_path': str(temp_path),
-            'original_file_name': uploaded_file.name,
-            'file_size': uploaded_file.size
-        })
-        
-        return temp_path
+        try:
+            temp_dir = Path("temp/uploads")
+            temp_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Genera nome file unico
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            temp_path = temp_dir / f"{timestamp}_{uploaded_file.name}"
+            
+            # Salva il file
+            temp_path.write_bytes(uploaded_file.getvalue())
+            
+            # Crea checkpoint iniziale con metadati estesi
+            initial_metadata = {
+                'stage': 'upload',
+                'file_path': str(temp_path),
+                'original_file_name': uploaded_file.name,
+                'file_size': uploaded_file.size,
+                'timestamp': timestamp,
+                'upload_time': datetime.now().isoformat()
+            }
+            
+            # Aggiorna i metadati della sessione
+            cls.update_session_metadata(initial_metadata)
+            
+            # Salva checkpoint
+            cls._save_processing_checkpoint(initial_metadata)
+            
+            return temp_path
+            
+        except Exception as e:
+            logger.error(f"Errore nel salvataggio del file: {e}")
+            raise
 
     @classmethod
     def save_results(cls, df: pd.DataFrame):
         """
         Salva i risultati nel session state e su disco.
+        
+        Args:
+            df: DataFrame con i risultati
         """
         try:
             st.session_state.results_df = df
@@ -95,25 +196,27 @@ class SessionManager:
             # Prepara metadati
             metadata = {
                 'timestamp': timestamp,
-                'query': st.session_state.last_query,
                 'file_name': filename,
                 'rows_count': len(df),
-                'columns': list(df.columns)
+                'columns': list(df.columns),
+                'last_operation': 'save_results',
+                'has_exports': bool(st.session_state.get('export_history', []))
             }
+            
+            # Aggiorna i metadati della sessione
+            cls.update_session_metadata(metadata)
             
             metadata_path = save_dir / f"metadata_{timestamp}.json"
             with open(metadata_path, 'w') as f:
                 json.dump(metadata, f)
                 
-            # Salva checkpoint finale con riferimenti ai file salvati
+            # Salva checkpoint finale
             cls._save_processing_checkpoint({
                 'stage': 'complete',
                 'timestamp': timestamp,
-                'file_name': filename,
-                'query': st.session_state.last_query,
+                'metadata': metadata,
                 'results_path': str(results_path),
-                'metadata_path': str(metadata_path),
-                'rows_count': len(df)
+                'metadata_path': str(metadata_path)
             }, is_final=True)
             
             logger.info(f"Risultati salvati con successo. Timestamp: {timestamp}")
@@ -124,15 +227,12 @@ class SessionManager:
 
     @classmethod
     def load_last_session(cls) -> bool:
-        """
-        Carica l'ultima sessione salvata.
-        """
+        """Carica l'ultima sessione salvata."""
         try:
-            # Prima cerca nella directory results
             results_dir = Path("temp/results")
             if not results_dir.exists():
                 return False
-                
+                    
             # Trova l'ultimo file di risultati basato sul timestamp
             result_files = sorted(
                 results_dir.glob("results_*.csv"), 
@@ -144,24 +244,12 @@ class SessionManager:
                 return False
                 
             latest_result = result_files[0]
-            metadata_file = results_dir / f"metadata_{latest_result.stem.split('_')[1]}.json"
+            timestamp = latest_result.stem.split('_')[1]
             
-            if latest_result.exists() and metadata_file.exists():
-                # Carica risultati
-                st.session_state.results_df = pd.read_csv(latest_result)
-                with open(metadata_file, 'r') as f:
-                    metadata = json.load(f)
+            return cls.load_specific_session(timestamp)
                 
-                # Ripristina stato
-                st.session_state.last_query = metadata.get('query', '')
-                st.session_state.processing_timestamp = metadata.get('timestamp')
-                st.session_state.uploaded_file = metadata.get('file_name')
-                return True
-                
-            return False
-            
         except Exception as e:
-            logger.error(f"Errore nel caricamento della sessione: {e}")
+            logger.error(f"Errore nel caricamento dell'ultima sessione: {e}")
             return False
     
     @classmethod
@@ -182,10 +270,15 @@ class SessionManager:
                 with open(metadata_file, 'r') as f:
                     metadata = json.load(f)
                 
-                # Aggiorna stato sessione
-                st.session_state.last_query = metadata.get('query', '')
+                # Aggiorna stato sessione con tutti i metadati
                 st.session_state.processing_timestamp = metadata.get('timestamp')
                 st.session_state.uploaded_file = metadata.get('file_name')
+                st.session_state.session_metadata = metadata
+                st.session_state.export_history = metadata.get('export_history', [])
+                
+                # Aggiorna il processing state se presente
+                if 'processing_state' in metadata:
+                    st.session_state.processing_state = metadata['processing_state']
                 
                 logger.info(f"Sessione {timestamp} caricata con successo")
                 return True
@@ -203,39 +296,83 @@ class SessionManager:
         """
         try:
             results_dir = Path("temp/results")
-            results_file = results_dir / f"results_{timestamp}.csv"
-            metadata_file = results_dir / f"metadata_{timestamp}.json"
+            files_to_delete = [
+                results_dir / f"results_{timestamp}.csv",
+                results_dir / f"metadata_{timestamp}.json"
+            ]
             
-            if results_file.exists():
-                results_file.unlink()
-            if metadata_file.exists():
-                metadata_file.unlink()
+            # Cerca anche eventuali file temporanei associati
+            temp_dir = Path("temp/current")
+            if temp_dir.exists():
+                temp_pattern = f"*_{timestamp}_*"
+                files_to_delete.extend(temp_dir.glob(temp_pattern))
+            
+            deleted = False
+            for file in files_to_delete:
+                if file.exists():
+                    file.unlink()
+                    deleted = True
+                    
+            if deleted:
+                logger.info(f"Sessione {timestamp} eliminata con successo")
                 
-            logger.info(f"Sessione {timestamp} eliminata con successo")
-            return True
-            
+                # Se la sessione corrente è quella eliminata, pulisci lo stato
+                if st.session_state.get('processing_timestamp') == timestamp:
+                    cls._clear_current_session()
+                    
+            return deleted
+                
         except Exception as e:
             logger.error(f"Errore nell'eliminazione della sessione {timestamp}: {e}")
             return False
+    
+    @classmethod
+    def _clear_current_session(cls):
+        """Pulisce lo stato della sessione corrente."""
+        try:
+            # Pulisci tutti i campi della sessione
+            st.session_state.results_df = None
+            st.session_state.uploaded_file = None
+            st.session_state.processing_timestamp = None
+            st.session_state.processing_state = None
+            st.session_state.session_metadata = {}
+            st.session_state.export_history = []
+            # Mantieni session_id ma marca come nuova sessione
+            st.session_state.is_new_session = True
+            
+            logger.info("Sessione corrente pulita")
+        except Exception as e:
+            logger.error(f"Errore durante la pulizia della sessione: {e}")
+            raise
 
     @classmethod
     def update_processing_state(cls, state: Dict[str, Any], current_page: int):
         """
         Aggiorna lo stato di elaborazione corrente.
-        
-        Args:
-            state: Nuovo stato di elaborazione
-            current_page: Pagina corrente in elaborazione
         """
-        st.session_state.processing_state = state
-        st.session_state.current_page = current_page
-        
-        # Salva checkpoint
-        cls._save_processing_checkpoint({
-            'stage': 'processing',
-            'state': state,
-            'current_page': current_page
-        })
+        try:
+            st.session_state.processing_state = state
+            st.session_state.current_page = current_page
+            
+            # Aggiorna i metadati con lo stato di processing
+            metadata_update = {
+                'processing_state': state,
+                'current_page': current_page,
+                'last_update': datetime.now().isoformat()
+            }
+            cls.update_session_metadata(metadata_update)
+            
+            # Salva checkpoint
+            cls._save_processing_checkpoint({
+                'stage': 'processing',
+                'state': state,
+                'current_page': current_page,
+                'metadata': st.session_state.session_metadata
+            })
+            
+        except Exception as e:
+            logger.error(f"Errore nell'aggiornamento dello stato di processing: {e}")
+            raise
 
     @classmethod
     def _save_processing_checkpoint(cls, state: Dict[str, Any], is_final: bool = False):
@@ -257,28 +394,33 @@ class SessionManager:
 
     @classmethod
     def list_available_sessions(cls):
-        """
-        Lista tutte le sessioni disponibili.
-        """
+        """Lista tutte le sessioni disponibili."""
         sessions = []
         results_dir = Path("temp/results")
         
         if not results_dir.exists():
             return sessions
-            
+                
         for metadata_file in results_dir.glob("metadata_*.json"):
             try:
                 with open(metadata_file, 'r') as f:
                     metadata = json.load(f)
-                sessions.append({
+                    
+                # Aggiungi informazioni estese
+                session_info = {
                     'timestamp': metadata.get('timestamp'),
                     'file_name': metadata.get('file_name'),
-                    'query': metadata.get('query'),
-                    'rows_count': metadata.get('rows_count')
-                })
+                    'rows_count': metadata.get('rows_count', 0),
+                    'has_exports': metadata.get('has_exports', False),
+                    'export_count': len(metadata.get('export_history', [])),
+                    'last_operation': metadata.get('last_operation'),
+                    'last_export': metadata.get('last_export')
+                }
+                sessions.append(session_info)
+                    
             except Exception as e:
                 logger.error(f"Errore nel caricamento della sessione {metadata_file}: {e}")
-                
+                    
         return sorted(sessions, key=lambda x: x['timestamp'], reverse=True)
 
     @classmethod
@@ -314,9 +456,7 @@ class SessionManager:
     def can_resume_processing(cls) -> bool:
         """
         Verifica se è possibile riprendere un'elaborazione interrotta.
-        
-        Returns:
-            bool: True se c'è un'elaborazione da riprendere
         """
         return (st.session_state.processing_state is not None and 
-                st.session_state.processing_state.get('stage') == 'processing')
+                st.session_state.processing_state.get('stage') == 'processing' and
+                st.session_state.session_metadata.get('last_operation') != 'complete')
